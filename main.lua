@@ -1,3 +1,25 @@
+function mkBoundingBox(x, y, width, height)
+   if width < 0 then
+      x = x + width
+      width = - width
+   end
+   if height < 0 then
+      y = y + height
+      height = - height
+   end
+   local box = {x=x, y=y, width=width, height=height}
+   function box.overlaps(self, other)
+      if self.x > other.x + other.width or self.x + self.width < other.x then
+	 return false
+      end
+      if self.y > other.y + other.height or self.y + self.height < other.y then
+	 return false
+      end
+      return true
+   end
+   return box
+end
+
 function mkfighter(octile, color)
    local o = nil
    if octile < 4 then
@@ -23,7 +45,8 @@ function mkfighter(octile, color)
 	self.graphic = fighterpunch
 	self.height = 43
 	self.t = 0.1
-	if rectintersect(self.x + 19*self.o, self.y + 14, 7*self.o, 7, other.x, other.y, other.width*other.o, other.height) then
+	fistBox = mkBoundingBox(self.x + 19*self.o, self.y + 14, 7*self.o, 7)
+	if fistBox:overlaps(other:getBoundingBox()) then
 	   other.health = other.health - 10
 	end
      end
@@ -77,6 +100,9 @@ function mkfighter(octile, color)
       love.graphics.setColor(self.color)
       love.graphics.draw(self.graphic, self.x, self.y, 0, self.o, 1)
       love.graphics.printf(self.health, 1*650/8, 100, 6*650/8, self.side)
+   end
+   function fighter.getBoundingBox(self)
+      return mkBoundingBox(self.x, self.y, self.width * self.o, self.height)
    end
    return fighter
 end
