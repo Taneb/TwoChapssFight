@@ -20,7 +20,7 @@ function mkBoundingBox(x, y, width, height)
    return box
 end
 
-function mkfighter(octile, color)
+function mkfighter(name, octile, color, leftkey, upkey, rightkey, punchkey)
    local o = nil
    if octile < 4 then
       o = 1
@@ -30,9 +30,9 @@ function mkfighter(octile, color)
       side = "right"
    end
    local fighter = 
-      {graphic=fighterstatic, height=43, width=18, t=0, health=100,
+      {name=name, graphic=fighterstatic, height=43, width=18, t=0, health=100,
        x=octile*love.graphics.getWidth()/8, y=love.graphics.getHeight()/2, o=o,
-       xv=0, yv=0, color=color, side=side
+       xv=0, yv=0, color=color, side=side, leftkey=leftkey, rightkey=rightkey
       }
    function fighter.jump(self)
       -- tells a fighter to jump if it is touching the ground
@@ -40,25 +40,30 @@ function mkfighter(octile, color)
 	 self.yv = self.yv - 500
       end
    end
-   function fighter.punch(self, other)
+   function fighter.punch(self)
      if self.t == 0 then
 	self.graphic = fighterpunch
 	self.height = 43
 	self.t = 0.1
-	fistBox = mkBoundingBox(self.x + 19*self.o, self.y + 14, 7*self.o, 7)
-	if fistBox:overlaps(other:getBoundingBox()) then
-	   other.health = other.health - 10
+	local fistBox = mkBoundingBox(self.x + 19*self.o, self.y + 14, 7*self.o, 7)
+	local attackFunc = function(other)
+	   if other ~= self and fistBox:overlaps(other:getBoundingBox()) then
+	      other.health = other.health - 10
+	   end
 	end
+	overfighters(attackFunc)
      end
    end
    -- fighter.move is a little do-everything-y.
    -- split it up?
-   function fighter.move(self, dt, r, l)
+   function fighter.move(self, dt)
    -- deal with horizontal movement
-      if love.keyboard.isDown(l) and not love.keyboard.isDown(r) then
+      if love.keyboard.isDown(self.leftkey) 
+      and not love.keyboard.isDown(self.rightkey) then
 	 self.xv = -400
 	 self.o = -1
-      elseif love.keyboard.isDown(r) and not love.keyboard.isDown(l) then
+      elseif love.keyboard.isDown(self.rightkey) 
+      and not love.keyboard.isDown(self.leftkey) then
 	 self.xv = 400
 	 self.o = 1
       end
@@ -104,54 +109,42 @@ function mkfighter(octile, color)
    function fighter.getBoundingBox(self)
       return mkBoundingBox(self.x, self.y, self.width * self.o, self.height)
    end
+
+   keymap[upkey] = function () fighter:jump() end
+   keymap[punchkey] = function() fighter:punch() end
+
    return fighter
 end
 
-function rectintersect(x1, y1, w1, h1, x2, y2, w2, h2)
-   if w1 < 0 then
-      x1 = x1 + w1
-      w1 = - w1
-   end
-   if h1 < 0 then
-      y1 = y1 + h1
-      h1 = - h1
-   end
-   if w2 < 0 then
-      x2 = x2 + w2
-      w2 = - w2
-   end
-   if h2 < 0 then
-      y2 = y2 + h2
-      h2 = - h2
-   end
-   if x1 > x2 + w2 or x1 + w1 < x2 then
-      return false
-   elseif y1 > y2 + h2 or y1 + h1 < y2 then
-      return false
-   else
-      return true
+function overfighters(func)
+   local i = 1
+   local fighter = fighters[i]
+   while fighter ~= nil do
+      func(fighter)
+      i = i+1
+      fighter = fighters[i]
    end
 end
 
 function love.keypressed(key)
-   -- player1
-   if key == "w" then -- jump
-      fighter1:jump()
-   elseif key == "lshift" or key == " " then
-      fighter1:punch(fighter2)
-   -- player2
-   elseif key == "kp8" then
-      fighter2:jump()
-   elseif key == "kp+" or key == "kp0" then
-      fighter2:punch(fighter1)
+   local func = keymap[key]
+   if func ~= nil then
+      func()
    end
 end
 
 function checkgameover()
-   if fighter1.health <= 0 then
-      gameover = "Player 2"
-   elseif fighter2.health <= 0 then
-      gameover = "Player 1"
+   local alivecount = 0
+   local alive
+   local countFunc = function(fighter)
+      if fighter.health > 0 then
+	 alive = fighter.name
+	 alivecount = alivecount + 1
+      end
+   end
+   overfighters(countFunc)
+   if alivecount <= 1 then
+      winner = alive
    end
 end
 
@@ -164,29 +157,32 @@ function love.load()
    love.window.setMode(650, 650)
    gravity = 1000
 
-   -- create first fighter
-   fighter1 = mkfighter(1, {255,0,0})
+   -- keymap is a map from keys to function to call when that key is pressed
+   -- this is handled by love.keypressed
+   -- this should be defined in a better place!
+   keymap = {}
 
-   -- create second fighter
-   fighter2 = mkfighter(7, {0,0,255})
+   -- create fighters
+   fighters = {
+      mkfighter("Player 1", 1, {255,0,0}, "a", "w", "d", "lshift"),
+      mkfighter("Player 2", 7, {0,0,255}, "kp4", "kp8", "kp6", "kpenter")
+   }
 end
 
 function love.update(dt)
-   if gameover == nil then
-      fighter1:move(dt, "d", "a")
-      fighter2:move(dt, "kp6", "kp4")
+   if winner == nil then
+      overfighters(function(fighter) fighter:move(dt) end)
       checkgameover()
    end
 end
 
 function love.draw()
-   if gameover == nil then
+   if winner == nil then
       love.graphics.setColor(14, 72, 160)
       love.graphics.rectangle("fill", 0, 600, 650, 50)
-      fighter1:draw()
-      fighter2:draw()
+      overfighters(function(fighter) fighter:draw() end)
    else
       love.graphics.setColor(0, 0, 0)
-      love.graphics.printf(gameover.." wins!", 1*650/8, 300, 6*650/8, "center")
+      love.graphics.printf(winner .. " wins!", 1*650/8, 300, 6*650/8, "center")
    end
 end
