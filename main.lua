@@ -1,3 +1,86 @@
+function mkfighter(octile, color)
+   local o = nil
+   if octile < 4 then
+      o = 1
+      side = "left"
+   else
+      o = -1
+      side = "right"
+   end
+   local fighter = 
+      {graphic=fighterstatic, height=43, width=18, t=0, health=100,
+       x=octile*love.graphics.getWidth()/8, y=love.graphics.getHeight()/2, o=o,
+       xv=0, yv=0, color=color, side=side
+      }
+   function fighter.jump(self)
+      -- tells a fighter to jump if it is touching the ground
+      if self.y + self.height == 600 then
+	 self.yv = self.yv - 500
+      end
+   end
+   function fighter.punch(self, other)
+     if self.t == 0 then
+	self.graphic = fighterpunch
+	self.height = 43
+	self.t = 0.1
+	if rectintersect(self.x + 19*self.o, self.y + 14, 7*self.o, 7, other.x, other.y, other.width*other.o, other.height) then
+	   other.health = other.health - 10
+	end
+     end
+   end
+   -- fighter.move is a little do-everything-y.
+   -- split it up?
+   function fighter.move(self, dt, r, l)
+   -- deal with horizontal movement
+      if love.keyboard.isDown(l) and not love.keyboard.isDown(r) then
+	 self.xv = -400
+	 self.o = -1
+      elseif love.keyboard.isDown(r) and not love.keyboard.isDown(l) then
+	 self.xv = 400
+	 self.o = 1
+      end
+      -- turn velocities into movement
+      self.x = self.x + self.xv * dt
+      self.y = math.min(self.y + self.yv * dt, 600 - self.height)
+      -- deal with gravity
+      if self.y + self.height == 600 then
+	 self.yv = 0
+      else
+	 self.yv = self.yv + gravity * dt
+      end
+      --deal with friction
+      if self.y + self.height == 600 then
+	 friction = 5000
+      else
+	 friction = 100
+      end
+      if math.abs(self.xv) > 1 then
+	 friction = friction * dt * math.abs(self.xv)/self.xv
+	 if math.abs(friction) > math.abs(self.xv) then
+	    self.xv = 0
+	 else
+	    self.xv = self.xv - friction
+	 end
+      else
+	 self.xv = 0
+      end
+      
+      self.t = self.t - dt
+      
+      if self.t <= 0 then
+	 self.graphic = fighterstatic
+	 self.height = 43
+	 self.t = 0
+      end
+   end
+   function fighter.draw(self)
+      love.graphics.setColor(self.color)
+      love.graphics.draw(self.graphic, self.x, self.y, 0, self.o, 1)
+      love.graphics.printf(self.health, 1*650/8, 100, 6*650/8, self.side)
+   end
+   return fighter
+end
+
 function rectintersect(x1, y1, w1, h1, x2, y2, w2, h2)
    if w1 < 0 then
       x1 = x1 + w1
@@ -27,83 +110,21 @@ end
 function love.keypressed(key)
    -- player1
    if key == "w" then -- jump
-      jumpfighter(objects.fighter1)
+      fighter1:jump()
    elseif key == "lshift" or key == " " then
-      punchfighter(objects.fighter1, objects.fighter2)
+      fighter1:punch(fighter2)
    -- player2
    elseif key == "kp8" then
-      jumpfighter(objects.fighter2)
+      fighter2:jump()
    elseif key == "kp+" or key == "kp0" then
-      punchfighter(objects.fighter2, objects.fighter1)
+      fighter2:punch(fighter1)
    end
 end
-
-function jumpfighter(fighter)
-   -- tells a fighter to jump if it is touching the ground
-   if fighter.y + fighter.height == 600 then
-      fighter.yv = fighter.yv - 500
-   end
-end
-
-function punchfighter(fighter, otherfighter)
-   if fighter.t == 0 then
-      fighter.graphic = fighterpunch
-      fighter.height = 43
-      fighter.t = 0.1
-      if rectintersect(fighter.x + 19*fighter.o, fighter.y + 14, 7*fighter.o, 7, otherfighter.x, otherfighter.y, otherfighter.width*otherfighter.o, otherfighter.height) then
-	 otherfighter.health = otherfighter.health - 10
-      end
-   end
-end
-
-function movefighter(fighter, dt, r, l)
-   -- deal with horizontal movement
-   if love.keyboard.isDown(l) and not love.keyboard.isDown(r) then
-      fighter.xv = -400
-      fighter.o = -1
-   elseif love.keyboard.isDown(r) and not love.keyboard.isDown(l) then
-      fighter.xv = 400
-      fighter.o = 1
-   end
-   -- turn velocities into movement
-   fighter.x = fighter.x + fighter.xv * dt
-   fighter.y = math.min(fighter.y + fighter.yv * dt, 600 - fighter.height)
-   -- deal with gravity
-   if fighter.y + fighter.height == 600 then
-      fighter.yv = 0
-   else
-      fighter.yv = fighter.yv + gravity * dt
-   end
-   --deal with friction
-   if fighter.y + fighter.height == 600 then
-      friction = 5000
-   else
-      friction = 100
-   end
-   if math.abs(fighter.xv) > 1 then
-      friction = friction * dt * math.abs(fighter.xv)/fighter.xv
-      if math.abs(friction) > math.abs(fighter.xv) then
-	 fighter.xv = 0
-      else
-	 fighter.xv = fighter.xv - friction
-      end
-   else
-      fighter.xv = 0
-   end
-
-   fighter.t = fighter.t - dt
-
-   if fighter.t <= 0 then
-      fighter.graphic = fighterstatic
-      fighter.height = 43
-      fighter.t = 0
-   end
-end   
 
 function checkgameover()
-   if objects.fighter1.health <= 0 then
+   if fighter1.health <= 0 then
       gameover = "Player 2"
-   elseif objects.fighter2.health <= 0 then
+   elseif fighter2.health <= 0 then
       gameover = "Player 1"
    end
 end
@@ -113,44 +134,33 @@ function love.load()
    fighterpunch  = love.graphics.newImage("fighterpunch.png")
    love.graphics.setFont(love.graphics.newFont(20))
    love.graphics.setColor(0,0,0)
-   love.graphics.setBackgroundColor(255,127,127)
+   love.graphics.setBackgroundColor(200,250,255)
    love.window.setMode(650, 650)
    gravity = 1000
 
-   objects = {}
-
    -- create first fighter
-   objects.fighter1 = {x=1*650/8, y=650/2, xv=0, yv=0, o=1, graphic=fighterstatic, height=43, width=18, t=0, health=100}
+   fighter1 = mkfighter(1, {255,0,0})
 
    -- create second fighter
-   objects.fighter2 = {x=7*650/8, y=650/2, xv=0, yv=0, o=-1, graphic=fighterstatic, height=43, width=18, t=0, health=100}
+   fighter2 = mkfighter(7, {0,0,255})
 end
 
 function love.update(dt)
-   movefighter(objects.fighter1, dt, "d", "a")
-   movefighter(objects.fighter2, dt, "kp6", "kp4")
-   checkgameover()
+   if gameover == nil then
+      fighter1:move(dt, "d", "a")
+      fighter2:move(dt, "kp6", "kp4")
+      checkgameover()
+   end
 end
 
 function love.draw()
    if gameover == nil then
       love.graphics.setColor(14, 72, 160)
       love.graphics.rectangle("fill", 0, 600, 650, 50)
-      love.graphics.setColor(255,0,0)
-      love.graphics.draw(objects.fighter1.graphic, objects.fighter1.x, objects.fighter1.y, 0, objects.fighter1.o, 1)
-      love.graphics.printf(objects.fighter1.health, 1*650/8, 100, 6*650/8, "left")
-      love.graphics.setColor(0,0,255)
-      love.graphics.draw(objects.fighter2.graphic, objects.fighter2.x, objects.fighter2.y, 0, objects.fighter2.o, 1)
-      love.graphics.printf(objects.fighter2.health, 1*650/8, 100, 6*650/8, "right")
+      fighter1:draw()
+      fighter2:draw()
    else
       love.graphics.setColor(0, 0, 0)
-      love.graphics.printf(gameover .. " wins!", 1*650/8, 300, 6*650/8, "center")
-   end
-end
-
-function love.mousepressed(x, y, button)
-   if button == 'l' then
-      imgx = x
-      imgy = y
+      love.graphics.printf(gameover.." wins!", 1*650/8, 300, 6*650/8, "center")
    end
 end
