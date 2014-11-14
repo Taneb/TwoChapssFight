@@ -22,17 +22,21 @@ end
 
 function mkfighter(name, octile, color, leftkey, upkey, rightkey, punchkey)
    local o = nil
-   if octile < 4 then
+   if octile < 3 then
       o = 1
       side = "left"
-   else
+   elseif octile > 5 then
       o = -1
       side = "right"
+   else
+      o = math.random(0, 1) * 2 - 1
+      side = "center"
    end
    local fighter = 
       {name=name, graphic=fighterstatic, height=43, width=18, t=0, health=100,
        x=octile*love.graphics.getWidth()/8, y=love.graphics.getHeight()/2, o=o,
-       xv=0, yv=0, color=color, side=side, leftkey=leftkey, rightkey=rightkey
+       xv=0, yv=0, color=color, side=side, leftkey=leftkey, rightkey=rightkey,
+       alive=true
       }
    function fighter.jump(self)
       -- tells a fighter to jump if it is touching the ground
@@ -48,7 +52,7 @@ function mkfighter(name, octile, color, leftkey, upkey, rightkey, punchkey)
 	local fistBox = mkBoundingBox(self.x + 19*self.o, self.y + 14, 7*self.o, 7)
 	local attackFunc = function(other)
 	   if other ~= self and fistBox:overlaps(other:getBoundingBox()) then
-	      other.health = other.health - 10
+	      other:damage(10)
 	   end
 	end
 	overfighters(attackFunc)
@@ -103,8 +107,18 @@ function mkfighter(name, octile, color, leftkey, upkey, rightkey, punchkey)
    end
    function fighter.draw(self)
       love.graphics.setColor(self.color)
-      love.graphics.draw(self.graphic, self.x, self.y, 0, self.o, 1)
-      love.graphics.printf(self.health, 1*650/8, 100, 6*650/8, self.side)
+      if self.alive then
+	 love.graphics.draw(self.graphic, self.x, self.y, 0, self.o, 1)
+      end
+	 love.graphics.printf(self.health, 1*650/8, 100, 6*650/8, self.side)
+   end
+   function fighter.damage(self, damage)
+      if self.health > damage then
+	 self.health = self.health - damage
+      else
+	 self.health = 0
+	 self.alive = false
+      end
    end
    function fighter.getBoundingBox(self)
       return mkBoundingBox(self.x, self.y, self.width * self.o, self.height)
@@ -165,7 +179,7 @@ function love.load()
    -- create fighters
    fighters = {
       mkfighter("Player 1", 1, {255,0,0}, "a", "w", "d", "lshift"),
-      mkfighter("Player 2", 7, {0,0,255}, "kp4", "kp8", "kp6", "kpenter")
+      mkfighter("Player 2", 7, {0,0,255}, "kp4", "kp8", "kp6", "kpenter"),
    }
 end
 
