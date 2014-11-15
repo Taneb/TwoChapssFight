@@ -96,12 +96,11 @@ function mkfighter(name, octile, color, leftkey, upkey, rightkey, punchkey)
 	self.height = 43
 	self.t = 0.1
 	local fistBox = mkbox(self.x + 19*self.o, self.y + 14, 7*self.o, 7)
-	local function attack(other)
+	for _,other in pairs(fighters) do
 	   if other ~= self and fistBox:overlaps(other:getBoundingBox()) then
 	      other:damage(10)
 	   end
 	end
-	overfighters(attack)
      end
    end
    -- fighter.move is a little do-everything-y.
@@ -178,18 +177,6 @@ function mkfighter(name, octile, color, leftkey, upkey, rightkey, punchkey)
    return fighter
 end
 
--- map a function over all the fighters.
--- please figure out how for loops work and use that instead
-function overfighters(func)
-   local i = 1
-   local fighter = fighters[i]
-   while fighter ~= nil do
-      func(fighter)
-      i = i+1
-      fighter = fighters[i]
-   end
-end
-
 -- check if the game has ended
 --
 -- the way this is done is to go through the list of fighters, counting how
@@ -204,13 +191,12 @@ end
 function checkifgameended()
    local alivecount = 0
    local alive
-   local function count(fighter)
+   for _,fighter in pairs(fighters) do
       if fighter.alive then
 	 alive = fighter.name
 	 alivecount = alivecount + 1
       end
    end
-   overfighters(count)
    if alivecount == 1 then
       winner = alive
    elseif alivecount == 0 then
@@ -277,7 +263,9 @@ end
 -- it feels neater.
 function love.update(dt)
    if winner == nil then
-      overfighters(function(fighter) fighter:move(dt) end)
+      for _,fighter in pairs(fighters) do
+	 fighter:move(dt)
+      end
       checkifgameended()
    end
 end
@@ -294,7 +282,10 @@ function love.draw()
       love.graphics.setColor(14, 72, 160)
       love.graphics.rectangle("fill", 0, 600, 650, 50)
       -- render each fighter
-      overfighters(function(fighter) fighter:draw() end)
+      for _,fighter in pairs(fighters) do
+	 fighter:draw()
+      end
+--      overfighters(function(fighter) fighter:draw() end)
    else
       -- render victory screen
       love.graphics.setColor(0, 0, 0)
